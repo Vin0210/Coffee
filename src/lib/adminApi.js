@@ -168,7 +168,7 @@ export async function listOrders(limit = 100) {
   needLive()
   const { data, error } = await supabase
     .from('orders')
-    .select('id, ref, customer_name, customer_phone, customer_email, order_type, address, subtotal, fee, total, status, payment_status, created_at, order_items(id, qty)')
+    .select('id, ref, customer_name, customer_phone, customer_email, order_type, address, delivery_lat, delivery_lng, note, subtotal, fee, total, status, payment_status, created_at, order_items(id, name, qty)')
     .order('created_at', { ascending: false })
     .limit(limit)
   if (error) throw error
@@ -180,8 +180,11 @@ export async function listOrders(limit = 100) {
     customer_email: o.customer_email || '',
     order_type: o.order_type || 'pickup',
     address: o.address || '',
-    payment_status: o.payment_status || 'unpaid',
+    delivery_lat: o.delivery_lat ?? null,
+    delivery_lng: o.delivery_lng ?? null,
+    note: o.note || '',
     items: (o.order_items || []).reduce((n, i) => n + (i.qty || 0), 0),
+    lines: (o.order_items || []).map((i) => ({ name: i.name, qty: i.qty })),
     total: Number(o.total) || 0,
     type: o.order_type === 'delivery' ? 'Delivery' : 'Pickup',
     status: o.status,

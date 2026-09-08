@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
+import { ChevronDown, MapPin } from 'lucide-react'
 import { adminMock } from '../../data/misc'
 import { fmtDateTime, peso, cx } from '../../lib/format'
 import { STATUS_FLOW, STATUS_LABELS } from '../../components/OrderTimeline'
@@ -15,6 +16,7 @@ export default function AdminOrders() {
   const [orders, setOrders] = useState(live ? [] : adminMock.recentOrders)
   const [loading, setLoading] = useState(live)
   const [filter, setFilter] = useState('all')
+  const [openRef, setOpenRef] = useState(null)
 
   useEffect(() => {
     if (!live) return
@@ -70,25 +72,58 @@ export default function AdminOrders() {
               <tr><td colSpan={8} className="apage__empty">Loading orders…</td></tr>
             ) : (
               list.map((o) => (
-                <tr key={o.ref}>
-                  <td className="mono">{o.ref}</td>
-                  <td>{o.customer}</td>
-                  <td>{o.items}</td>
-                  <td>{peso(o.total)}</td>
-                  <td>{o.payment_status === 'paid' || o.paid ? <span className="pill pill--ok">Paid</span> : <span className="pill">Unpaid</span>}</td>
-                  <td>{o.type}</td>
-                  <td>
-                    <select
-                      className={cx('table-select', `pill--${o.status}`)}
-                      value={o.status}
-                      onChange={(e) => setStatus(o.id, o.ref, e.target.value)}
-                      aria-label={`Status for ${o.ref}`}
-                    >
-                      {ALL.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
-                    </select>
-                  </td>
-                  <td className="apage__muted">{fmtDateTime(o.date)}</td>
-                </tr>
+                <Fragment key={o.ref}>
+                  <tr>
+                    <td className="mono">
+                      <button
+                        type="button" onClick={() => setOpenRef(openRef === o.ref ? null : o.ref)}
+                        aria-expanded={openRef === o.ref} aria-label={`Details for ${o.ref}`}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                      >
+                        {o.ref} <ChevronDown size={13} strokeWidth={2.2} style={{ transform: openRef === o.ref ? 'rotate(180deg)' : 'none' }} />
+                      </button>
+                    </td>
+                    <td>{o.customer}</td>
+                    <td>{o.items}</td>
+                    <td>{peso(o.total)}</td>
+                    <td>{o.payment_status === 'paid' || o.paid ? <span className="pill pill--ok">Paid</span> : <span className="pill">Unpaid</span>}</td>
+                    <td>{o.type}</td>
+                    <td>
+                      <select
+                        className={cx('table-select', `pill--${o.status}`)}
+                        value={o.status}
+                        onChange={(e) => setStatus(o.id, o.ref, e.target.value)}
+                        aria-label={`Status for ${o.ref}`}
+                      >
+                        {ALL.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+                      </select>
+                    </td>
+                    <td className="apage__muted">{fmtDateTime(o.date)}</td>
+                  </tr>
+                  {openRef === o.ref && (
+                    <tr key={`${o.ref}-detail`}>
+                      <td colSpan={8}>
+                        <p className="apage__strong">{o.customer} <span className="apage__muted">· {o.phone || 'no phone'} · {o.customer_email || 'no email'}</span></p>
+                        {o.type === 'Delivery' || o.order_type === 'delivery' ? (
+                          <p style={{ marginTop: 6 }}>
+                            <MapPin size={13} strokeWidth={2} style={{ display: 'inline', verticalAlign: -2 }} /> {o.address || 'No address given'}
+                            {o.delivery_lat != null && o.delivery_lng != null && (
+                              <> · <a href={`https://www.google.com/maps/search/?api=1&query=${o.delivery_lat},${o.delivery_lng}`} target="_blank" rel="noreferrer">Open pin in Maps</a></>
+                            )}
+                          </p>
+                        ) : (
+                          <p className="apage__muted" style={{ marginTop: 6 }}>Pickup in store</p>
+                        )}
+                        {o.lines?.length > 0 && (
+                          <p className="apage__muted" style={{ marginTop: 6 }}>
+                            {o.lines.map((l) => `${l.name} × ${l.qty}`).join(' · ')}
+                          </p>
+                        )}
+                        {o.note && <p style={{ marginTop: 6 }}><em>“{o.note}”</em></p>}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))
             )}
           </tbody>

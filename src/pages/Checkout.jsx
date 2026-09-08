@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Wallet, CreditCard } from 'lucide-react'
+import { Wallet, CreditCard, MapPin } from 'lucide-react'
 import { Page } from '../components/Reveal'
 import { PageHead, EmptyState } from '../components/SectionHead'
 import { useCart } from '../context/CartContext'
@@ -27,8 +27,10 @@ export default function Checkout() {
   const [form, setForm] = useState({
     name: user?.full_name || '', phone: user?.phone || '', email: user?.email || '',
     type: 'pickup', pickupTime: pickupTimes[0], address: '', note: '', pay: 'cash',
+    delivery_lat: null, delivery_lng: null,
   })
   const [placing, setPlacing] = useState(false)
+  const [locating, setLocating] = useState(false)
   const [params] = useSearchParams()
   const fee = form.type === 'delivery' ? deliveryFee : 0
   const { allProducts } = useCatalog()
@@ -38,6 +40,29 @@ export default function Checkout() {
     phDataUri({ label: i.ph?.label || i.name, tone: i.ph?.tone || 'sand', kind: i.ph?.kind || 'arch' })
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }))
+
+  const pinLocation = () => {
+    if (!('geolocation' in navigator)) {
+      toast('Location is not available on this device — type your address instead.', 'error')
+      return
+    }
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        set({
+          delivery_lat: Number(pos.coords.latitude.toFixed(6)),
+          delivery_lng: Number(pos.coords.longitude.toFixed(6)),
+        })
+        setLocating(false)
+        toast('Pinned — the rider gets this exact spot plus your address.')
+      },
+      () => {
+        setLocating(false)
+        toast('Location blocked — allow it in the browser, or type your address.', 'error')
+      },
+      { enableHighAccuracy: true, timeout: 12000 }
+    )
+  }
   const valid =
     form.name.trim().length > 1 &&
     /^[\d+\-\s()]{7,}$/.test(form.phone.trim()) &&
@@ -62,6 +87,8 @@ export default function Checkout() {
         customer_email: form.email.trim(),
         order_type: form.type,
         address: form.type === 'delivery' ? form.address.trim() : null,
+        delivery_lat: form.type === 'delivery' ? form.delivery_lat : null,
+        delivery_lng: form.type === 'delivery' ? form.delivery_lng : null,
         pickup_time: form.pickupTime,
         payment_method: form.pay === 'paymongo' ? 'paymongo' : 'cash_pickup',
         subtotal, fee, total: subtotal + fee, note: form.note.trim(),
@@ -156,9 +183,25 @@ export default function Checkout() {
                   </label>
                 </div>
               ) : (
-                <label className="field cgroup__grid--mt"><span>Delivery address *</span>
-                  <input className="input" value={form.address} onChange={(e) => set({ address: e.target.value })} placeholder="Unit, building, street, city" required />
-                </label>
+                <>
+                  <label className="field cgroup__grid--mt"><span>Delivery address *</span>
+                    <input className="input" value={form.address} onChange={(e) => set({ address: e.target.value })} placeholder="Unit, building, street, barangay" required />
+                  </label>
+                  <div className="cgroup__grid--mt">
+                    {form.delivery_lat != null && form.delivery_lng != null ? (
+                      <p className="auth__demo">
+                        Pinned {form.delivery_lat}, {form.delivery_lng} —{' '}
+                        <a href={`https://www.google.com/maps/search/?api=1&query=${form.delivery_lat},${form.delivery_lng}`} target="_blank" rel="noreferrer">preview on map</a>
+                        {' · '}
+                        <button type="button" className="cartpage__clear" onClick={() => set({ delivery_lat: null, delivery_lng: null })}>remove pin</button>
+                      </p>
+                    ) : (
+                      <button type="button" className="btn btn--line btn--sm" onClick={pinLocation} disabled={locating}>
+                        <MapPin size={14} strokeWidth={2} /> {locating ? 'Locating…' : 'Pin my exact location'}
+                      </button>
+                    )}
+                  </div>
+                </>
               )}
             </fieldset>
 

@@ -42,7 +42,7 @@ export default function AdminHome() {
     <div className="apage">
       <header className="apage__head">
         <div><p className="eyebrow">Dashboard</p><h1>Overview</h1></div>
-        <p className="apage__date">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })} · Poblacion</p>
+        <p className="apage__date">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })} · Zamboanga</p>
       </header>
 
       <div className="acards">

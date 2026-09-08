@@ -3,6 +3,7 @@ import { Check, X, Plus } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
 import { supabaseConfigured } from '../../lib/supabase'
 import { listReservations, updateReservationStatus } from '../../lib/adminApi'
+import { sendReservationStatus } from '../../lib/email'
 import { fmtDate, cx } from '../../lib/format'
 
 const live = supabaseConfigured
@@ -28,6 +29,7 @@ export default function AdminReservations() {
   }, [toast])
 
   const setStatus = async (id, status) => {
+    const target = list.find((r) => r.id === id)
     setList((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)))
     if (!live) {
       toast(status === 'cancelled' ? 'Reservation cancelled.' : `Reservation ${status}.`)
@@ -36,6 +38,10 @@ export default function AdminReservations() {
     try {
       await updateReservationStatus(id, status)
       toast(status === 'cancelled' ? 'Reservation cancelled.' : `Reservation ${status}.`)
+      if ((status === 'confirmed' || status === 'cancelled') && target?.email) {
+        const res = await sendReservationStatus({ ...target, status })
+        toast(res.ok ? `Guest emailed — reservation ${status}.` : 'Saved (email skipped — no address on file).')
+      }
     } catch (err) {
       toast(`Update failed — ${err.message}`, 'error')
       listReservations().then(setList).catch(() => {})

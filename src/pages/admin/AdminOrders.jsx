@@ -5,6 +5,7 @@ import { STATUS_FLOW, STATUS_LABELS } from '../../components/OrderTimeline'
 import { useToast } from '../../context/ToastContext'
 import { supabaseConfigured } from '../../lib/supabase'
 import { listOrders, updateOrderStatus } from '../../lib/adminApi'
+import { sendOrderStatus } from '../../lib/email'
 
 const live = supabaseConfigured
 const ALL = [...STATUS_FLOW, 'cancelled']
@@ -24,11 +25,22 @@ export default function AdminOrders() {
   }, [toast])
 
   const setStatus = async (id, ref, status) => {
+    const target = orders.find((o) => o.ref === ref)
     setOrders((prev) => prev.map((o) => (o.ref === ref ? { ...o, status } : o)))
     if (!live) return
     try {
       await updateOrderStatus(id, status)
       toast(`Order ${ref} → ${STATUS_LABELS[status]}.`)
+      if ((status === 'ready' || status === 'completed') && target?.customer_email) {
+        const res = await sendOrderStatus({
+          ref, status,
+          customer_email: target.customer_email,
+          customer_name: target.customer,
+          order_type: target.order_type,
+          address: target.address,
+        })
+        toast(res.ok ? `Customer emailed — order ${status}.` : 'Status saved (email skipped).')
+      }
     } catch (err) {
       toast(`Update failed — ${err.message}`, 'error')
       listOrders().then(setOrders).catch(() => {})

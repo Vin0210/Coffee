@@ -10,13 +10,15 @@ import { reservationSlots, BRAND } from '../data/misc'
 import { supabase, supabaseConfigured } from '../lib/supabase'
 import { cx } from '../lib/format'
 
+const EMAIL_RE = /^\S+@\S+\.\S+$/
+
 export default function Reservations() {
   useMeta({ title: 'Reservations', description: 'Reserve a table at Alegre × Good Habits — coffee, clothes and company.' })
   const { user } = useAuth()
   const { toast } = useToast()
 
   const [form, setForm] = useState({
-    name: user?.full_name || '', phone: user?.phone || '',
+    name: user?.full_name || '', phone: user?.phone || '', email: user?.email || '',
     date: '', time: reservationSlots[2], guests: 2, request: '',
   })
   const [booking, setBooking] = useState(false)
@@ -24,24 +26,30 @@ export default function Reservations() {
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }))
   const today = new Date().toISOString().slice(0, 10)
-  const valid = form.name.trim().length > 1 && form.phone.trim().length >= 7 && form.date
+  const valid = form.name.trim().length > 1 && form.phone.trim().length >= 7 && EMAIL_RE.test(form.email.trim()) && form.date
 
   const submit = async (e) => {
     e.preventDefault()
     if (!valid || booking) return
     setBooking(true)
     const ref = 'RSV-' + Math.random().toString(36).slice(2, 6).toUpperCase()
+    const payload = {
+      user_id: user && !user.demo ? user.id : null,
+      name: form.name.trim(), phone: form.phone.trim(), email: form.email.trim(),
+      date: form.date, time: form.time, guests: form.guests,
+      request: form.request.trim(), status: 'pending',
+    }
     try {
       if (supabaseConfigured) {
-        await supabase.from('reservations').insert({
-          user_id: user && !user.demo ? user.id : null,
-          name: form.name.trim(), phone: form.phone.trim(),
-          date: form.date, time: form.time, guests: form.guests,
-          request: form.request.trim(), status: 'pending',
-        })
+        const { error } = await supabase.from('reservations').insert(payload)
+        if (error) throw error
+        // Confirmation email, best-effort — the booking already succeeded.
+        supabase.functions.invoke('send-email', {
+          body: { type: 'reservation-received', reservation: { ...payload, ref } },
+        }).catch(() => {})
       }
       setDone({ ...form, ref })
-      toast('Table requested — confirmation by SMS.')
+      toast('Table requested — confirmation by email and SMS.')
     } catch {
       toast('Could not save the reservation — try again.', 'error')
     } finally {
@@ -64,7 +72,7 @@ export default function Reservations() {
               <p className="resv-confirm__ref">Ref {done.ref}</p>
             </div>
             {done.request && <p className="resv-confirm__req">“{done.request}”</p>}
-            <p className="resv-confirm__note">Tables are held for 15 minutes past the reserved time. We'll text a confirmation shortly.</p>
+            <p className="resv-confirm__note">Tables are held for 15 minutes past the reserved time. We'll email your confirmation shortly.</p>
             <div className="resv-confirm__ctas">
               <button type="button" className="btn btn--line btn--sm" onClick={() => setDone(null)}>Book another</button>
               <a className="btn btn--solid btn--sm" href={BRAND.socials[0].href} target="_blank" rel="noreferrer">Follow for drop news</a>
@@ -92,6 +100,9 @@ export default function Reservations() {
               </label>
               <label className="field"><span>Phone *</span>
                 <input className="input" value={form.phone} onChange={(e) => set({ phone: e.target.value })} placeholder="+63 917 000 0000" required />
+              </label>
+              <label className="field field--wide"><span>Email * <span className="opt__hint">for booking confirmation</span></span>
+                <input className="input" type="email" value={form.email} onChange={(e) => set({ email: e.target.value })} placeholder="you@email.com" required />
               </label>
               <label className="field"><span>Date *</span>
                 <input className="input" type="date" min={today} value={form.date} onChange={(e) => set({ date: e.target.value })} required />

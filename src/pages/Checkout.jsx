@@ -103,7 +103,7 @@ export default function Checkout() {
             <fieldset className="cgroup">
               <legend className="cgroup__title">02 — Order type</legend>
               <div className="otype">
-                {[['pickup', 'Pickup', 'Free · ready in 15–20 min'], ['delivery', 'Delivery', `Metro Manila · ${peso(deliveryFee)}`]].map(([v, label, hint]) => (
+                {[['pickup', 'Pickup', 'Free · ready in 15–20 min'], ['delivery', 'Delivery', `Zamboanga City · ${peso(deliveryFee)}`]].map(([v, label, hint]) => (
                   <button
                     key={v} type="button"
                     className={cx('otype__opt', form.type === v && 'is-active')}

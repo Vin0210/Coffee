@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Check, Wallet } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Wallet, CreditCard } from 'lucide-react'
 import { Page } from '../components/Reveal'
 import { PageHead, EmptyState } from '../components/SectionHead'
 import { useCart } from '../context/CartContext'
@@ -9,6 +9,8 @@ import { useToast } from '../context/ToastContext'
 import { useMeta } from '../hooks'
 import { createOrder } from '../lib/orders'
 import { sendOrderConfirmation } from '../lib/email'
+import { createPaymentLink } from '../lib/paymongo'
+import { supabaseConfigured } from '../lib/supabase'
 import { pickupTimes, deliveryFee } from '../data/misc'
 import { peso, cx } from '../lib/format'
 import { phDataUri } from '../lib/placeholder'
@@ -24,9 +26,10 @@ export default function Checkout() {
 
   const [form, setForm] = useState({
     name: user?.full_name || '', phone: user?.phone || '', email: user?.email || '',
-    type: 'pickup', pickupTime: pickupTimes[0], address: '', note: '',
+    type: 'pickup', pickupTime: pickupTimes[0], address: '', note: '', pay: 'cash',
   })
   const [placing, setPlacing] = useState(false)
+  const [params] = useSearchParams()
   const fee = form.type === 'delivery' ? deliveryFee : 0
   const { allProducts } = useCatalog()
   const byId = (id) => allProducts().find((p) => p.id === id || p.slug === id)
@@ -41,6 +44,12 @@ export default function Checkout() {
     /^\S+@\S+\.\S+$/.test(form.email.trim()) &&
     (form.type === 'pickup' || form.address.trim().length > 5)
 
+  useEffect(() => {
+    if (params.get('payment') === 'cancelled') {
+      toast('Online payment was cancelled — your order is saved, pay in store or try again.', 'error')
+    }
+  }, [params, toast])
+
   const place = async (e) => {
     e.preventDefault()
     if (!valid || placing) return
@@ -54,13 +63,31 @@ export default function Checkout() {
         order_type: form.type,
         address: form.type === 'delivery' ? form.address.trim() : null,
         pickup_time: form.pickupTime,
-        payment_method: 'cash_pickup',
+        payment_method: form.pay === 'paymongo' ? 'paymongo' : 'cash_pickup',
         subtotal, fee, total: subtotal + fee, note: form.note.trim(),
         items: items.map((i) => ({ name: i.name, unit_price: i.price, qty: i.qty, options: i.options, line_total: i.price * i.qty })),
       }
       const { ref } = await createOrder(payload)
       // Receipt email (customer) + new-order ping (shop). Never blocks checkout.
       sendOrderConfirmation({ ref, ...payload })
+      if (form.pay === 'paymongo') {
+        try {
+          const checkoutUrl = await createPaymentLink({
+            ref,
+            total: subtotal + fee,
+            email: form.email.trim(),
+            name: form.name.trim(),
+          })
+          clear()
+          window.location.href = checkoutUrl
+          return
+        } catch (payErr) {
+          toast(`Order ${ref} saved, but online payment failed — pay in store instead. (${payErr.message})`, 'error')
+          clear()
+          navigate(`/orders/${ref}`, { state: { fresh: true } })
+          return
+        }
+      }
       clear()
       toast('Order placed — we got you.')
       navigate(`/orders/${ref}`, { state: { fresh: true } })
@@ -137,14 +164,35 @@ export default function Checkout() {
 
             <fieldset className="cgroup">
               <legend className="cgroup__title">03 — Payment</legend>
-              <div className="payopt is-active">
-                <span className="payopt__icon"><Wallet size={16} strokeWidth={1.8} /></span>
-                <div>
-                  <p className="payopt__name">Cash on pickup{form.type === 'delivery' ? ' / delivery' : ''}</p>
-                  <p className="payopt__hint">Pay when you receive your order. GCash & cards coming soon.</p>
-                </div>
-                <span className="payopt__check"><Check size={14} strokeWidth={2.4} /></span>
+              <div className="otype">
+                <button
+                  type="button"
+                  className={cx('otype__opt', form.pay === 'cash' && 'is-active')}
+                  onClick={() => set({ pay: 'cash' })}
+                  aria-pressed={form.pay === 'cash'}
+                >
+                  <span className="otype__radio" aria-hidden="true" />
+                  <span className="otype__label"><Wallet size={15} strokeWidth={1.8} style={{ display: 'inline', verticalAlign: -2 }} /> Cash</span>
+                  <span className="otype__hint">Pay when you receive your order{form.type === 'delivery' ? ' / delivery' : ''}.</span>
+                </button>
+                <button
+                  type="button"
+                  className={cx('otype__opt', form.pay === 'paymongo' && 'is-active')}
+                  onClick={() => supabaseConfigured && set({ pay: 'paymongo' })}
+                  aria-pressed={form.pay === 'paymongo'}
+                  disabled={!supabaseConfigured}
+                  title={supabaseConfigured ? 'Pay online' : 'Online payment needs Supabase connected'}
+                >
+                  <span className="otype__radio" aria-hidden="true" />
+                  <span className="otype__label"><CreditCard size={15} strokeWidth={1.8} style={{ display: 'inline', verticalAlign: -2 }} /> GCash / Card</span>
+                  <span className="otype__hint">{supabaseConfigured ? 'Pay online now — GCash, GrabPay, cards.' : 'Coming online soon.'}</span>
+                </button>
               </div>
+              {form.pay === 'paymongo' && (
+                <p className="auth__demo" style={{ marginTop: 14 }}>
+                  You'll be redirected to PayMongo's secure checkout, then back here for tracking.
+                </p>
+              )}
               <label className="field cgroup__grid--mt"><span>Notes for the bar (optional)</span>
                 <input className="input" value={form.note} onChange={(e) => set({ note: e.target.value })} placeholder="Oat milk on the side, extra napkins, it's a gift…" />
               </label>
@@ -169,9 +217,11 @@ export default function Checkout() {
             <div className="cartpage__row"><span>{form.type === 'delivery' ? 'Delivery' : 'Pickup'}</span><strong>{fee ? peso(fee) : 'Free'}</strong></div>
             <div className="cartpage__row cartpage__row--total"><span>Total</span><strong>{peso(subtotal + fee)}</strong></div>
             <button type="submit" className="btn btn--solid btn--full" disabled={!valid || placing}>
-              {placing ? 'Placing order…' : `Place order — ${peso(subtotal + fee)}`}
+              {placing
+                ? (form.pay === 'paymongo' ? 'Opening secure checkout…' : 'Placing order…')
+                : (form.pay === 'paymongo' ? `Pay ${peso(subtotal + fee)} online` : `Place order — ${peso(subtotal + fee)}`)}
             </button>
-            <p className="checkout__fine">You'll receive SMS updates as your order moves.</p>
+            <p className="checkout__fine">You'll receive email updates as your order moves.</p>
           </aside>
         </form>
       </div>

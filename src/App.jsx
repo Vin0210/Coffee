@@ -20,6 +20,7 @@ const About = lazy(() => import('./pages/About'))
 const Reservations = lazy(() => import('./pages/Reservations'))
 const Cart = lazy(() => import('./pages/Cart'))
 const Checkout = lazy(() => import('./pages/Checkout'))
+const CheckoutSuccess = lazy(() => import('./pages/CheckoutSuccess'))
 const OrderStatus = lazy(() => import('./pages/OrderStatus'))
 const Auth = lazy(() => import('./pages/Auth'))
 const AuthCallback = lazy(() => import('./pages/AuthCallback'))
@@ -81,6 +82,7 @@ function AnimatedRoutes() {
       <Route path="/reservations" element={<SiteLayout><Reservations /></SiteLayout>} />
       <Route path="/cart" element={<SiteLayout><Cart /></SiteLayout>} />
       <Route path="/checkout" element={<SiteLayout><Checkout /></SiteLayout>} />
+      <Route path="/checkout/success" element={<SiteLayout><CheckoutSuccess /></SiteLayout>} />
       <Route path="/orders/:ref" element={<SiteLayout><OrderStatus /></SiteLayout>} />
       <Route path="/auth" element={<SiteLayout><Auth /></SiteLayout>} />
       <Route path="/auth/reset" element={<SiteLayout><Auth initialMode="reset" /></SiteLayout>} />

@@ -78,7 +78,8 @@ update public.profiles set role = 'admin' where email = 'you@example.com';
 /about            Brand story
 /reservations     Table booking with confirmation
 /cart             Unified cart (coffee + thrift in one checkout)
-/checkout         Pickup/delivery, cash on pickup (online payments can slot in later)
+/checkout         Pickup/delivery, cash or PayMongo (GCash, GrabPay, cards)
+/checkout/success Payment verification landing page (PayMongo redirect)
 /orders/:ref      Animated order tracking (received → confirmed → preparing → ready → completed)
 /auth             Sign in / register (Supabase Auth)
 /account          Profile, orders, favorites, Good Habits Rewards
@@ -86,7 +87,26 @@ update public.profiles set role = 'admin' where email = 'you@example.com';
                   customers, reservations, events, promotions, reports
 ```
 
-## Deploy to Cloudflare Pages (free)
+## Online payments (PayMongo)
+
+Checkout offers cash plus PayMongo Links (GCash, GrabPay, cards). The shop never
+touches card data — customers pay on PayMongo's hosted page.
+
+Setup (all in your Supabase project + a free PayMongo account):
+
+1. PayMongo dashboard → Developers → get **test** keys first (`sk_test_…`).
+2. SQL Editor → run `supabase/migration-payments.sql`.
+3. Secrets + deploy the function:
+   ```bash
+   supabase secrets set PAYMONGO_SECRET_KEY=sk_test_... SITE_URL=https://yourdomain.com
+   supabase functions deploy paymongo
+   ```
+4. Test with PayMongo's test e-wallets/cards, then swap to `sk_live_…` and repeat step 3.
+5. Recommended: PayMongo dashboard → Webhooks → add
+   `https://xxxx.supabase.co/functions/v1/paymongo` with event
+   `link.payment.paid` — auto-marks orders paid even if the customer closes
+   the tab instead of returning. (The success page also verifies on return,
+   and every paid claim is re-checked with PayMongo's API before writing.)
 
 1. Push this repo to GitHub.
 2. Cloudflare Dashboard → Workers & Pages → Create → Pages → **Connect to Git**.

@@ -64,10 +64,10 @@ export default function AdminOrders() {
 
       <section className="apanel">
         <table className="table">
-          <thead><tr><th>Order #</th><th>Customer</th><th>Items</th><th>Total</th><th>Type</th><th>Status</th><th>Date</th></tr></thead>
+          <thead><tr><th>Order #</th><th>Customer</th><th>Items</th><th>Total</th><th>Pay</th><th>Type</th><th>Status</th><th>Date</th></tr></thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="apage__empty">Loading orders…</td></tr>
+              <tr><td colSpan={8} className="apage__empty">Loading orders…</td></tr>
             ) : (
               list.map((o) => (
                 <tr key={o.ref}>
@@ -75,6 +75,7 @@ export default function AdminOrders() {
                   <td>{o.customer}</td>
                   <td>{o.items}</td>
                   <td>{peso(o.total)}</td>
+                  <td>{o.payment_status === 'paid' || o.paid ? <span className="pill pill--ok">Paid</span> : <span className="pill">Unpaid</span>}</td>
                   <td>{o.type}</td>
                   <td>
                     <select

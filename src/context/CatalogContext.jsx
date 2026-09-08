@@ -16,6 +16,7 @@ export function CatalogProvider({ children }) {
   const [source, setSource] = useState('static')
   const [loading, setLoading] = useState(supabaseConfigured)
   const [error, setError] = useState(null)
+  const [revision, setRevision] = useState(0)
 
   useEffect(() => {
     if (!supabaseConfigured) return
@@ -40,7 +41,7 @@ export function CatalogProvider({ children }) {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [])
+  }, [revision])
 
   const value = useMemo(() => ({
     coffee: data.coffee,
@@ -50,6 +51,8 @@ export function CatalogProvider({ children }) {
     loading,
     error,
     source,
+    /** Silently re-fetch the live catalog (call after admin mutations). */
+    refresh: () => setRevision((r) => r + 1),
     ...createSelectors(data),
   }), [data, loading, error, source])
 

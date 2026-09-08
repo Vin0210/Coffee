@@ -1,8 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Modal } from '../../components/admin/ui'
 import { useToast } from '../../context/ToastContext'
+import { useCatalog } from '../../context/CatalogContext'
+import { supabaseConfigured } from '../../lib/supabase'
+import { listEvents, createEvent, updateEvent } from '../../lib/adminApi'
 import { fmtDate, cx } from '../../lib/format'
+
+const live = supabaseConfigured
 
 const INITIAL = [
   { id: 1, title: 'THRIFT DROP 04', date: '2026-09-11', time: '7:00 PM', slots: '40 pieces', status: 'upcoming' },
@@ -13,16 +18,54 @@ const INITIAL = [
 
 export default function AdminEvents() {
   const { toast } = useToast()
-  const [list, setList] = useState(INITIAL)
+  const { refresh } = useCatalog()
+  const [list, setList] = useState(live ? [] : INITIAL)
+  const [loading, setLoading] = useState(live)
   const [adding, setAdding] = useState(false)
-  const [form, setForm] = useState({ title: '', date: '', time: '7:00 PM', slots: '' })
+  const [form, setForm] = useState({ title: '', date: '', time: '7:00 PM', slots: '', description: '' })
+  const [saving, setSaving] = useState(false)
 
-  const add = (e) => {
+  useEffect(() => {
+    if (!live) return
+    listEvents()
+      .then(setList)
+      .catch((err) => toast(`Couldn't load events — ${err.message}`, 'error'))
+      .finally(() => setLoading(false))
+  }, [toast])
+
+  const add = async (e) => {
     e.preventDefault()
-    setList((prev) => [{ id: Date.now(), ...form, status: 'upcoming' }, ...prev])
-    toast('Event published.')
-    setAdding(false)
-    setForm({ title: '', date: '', time: '7:00 PM', slots: '' })
+    setSaving(true)
+    try {
+      if (live) {
+        const created = await createEvent(form)
+        setList((prev) => [created, ...prev].sort((a, b) => String(a.date).localeCompare(String(b.date))))
+        refresh()
+        toast('Event published — live on the site.')
+      } else {
+        setList((prev) => [{ id: Date.now(), ...form, status: 'upcoming' }, ...prev])
+        toast('Event published.')
+      }
+      setAdding(false)
+      setForm({ title: '', date: '', time: '7:00 PM', slots: '', description: '' })
+    } catch (err) {
+      toast(`Publish failed — ${err.message}`, 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const toggleStatus = async (e) => {
+    const next = e.status === 'upcoming' ? 'past' : 'upcoming'
+    setList((prev) => prev.map((x) => (x.id === e.id ? { ...x, status: next } : x)))
+    if (!live) return
+    try {
+      await updateEvent(e.id, { status: next })
+      refresh()
+    } catch (err) {
+      setList((prev) => prev.map((x) => (x.id === e.id ? { ...x, status: e.status } : x)))
+      toast(`Update failed — ${err.message}`, 'error')
+    }
   }
 
   return (
@@ -38,31 +81,39 @@ export default function AdminEvents() {
         <table className="table">
           <thead><tr><th>Event</th><th>Date</th><th>Time</th><th>Slots</th><th>Status</th></tr></thead>
           <tbody>
-            {list.map((e) => (
-              <tr key={e.id}>
-                <td className="apage__strong">{e.title}</td>
-                <td>{fmtDate(e.date)}</td>
-                <td>{e.time}</td>
-                <td>{e.slots}</td>
-                <td>
-                  <button
-                    type="button"
-                    className={cx('pill', e.status === 'upcoming' ? 'pill--confirmed' : 'pill--cancelled')}
-                    onClick={() => setList((prev) => prev.map((x) => (x.id === e.id ? { ...x, status: x.status === 'upcoming' ? 'past' : 'upcoming' } : x)))}
-                  >
-                    {e.status}
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {loading ? (
+              <tr><td colSpan={5} className="apage__empty">Loading events…</td></tr>
+            ) : (
+              list.map((e) => (
+                <tr key={e.id}>
+                  <td className="apage__strong">{e.title}</td>
+                  <td>{fmtDate(e.date)}</td>
+                  <td>{e.time}</td>
+                  <td>{e.slots}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className={cx('pill', e.status === 'upcoming' ? 'pill--confirmed' : 'pill--cancelled')}
+                      onClick={() => toggleStatus(e)}
+                    >
+                      {e.status}
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
+        {!loading && list.length === 0 && <p className="apage__empty">No events yet — publish the first one.</p>}
       </section>
 
       <Modal open={adding} onClose={() => setAdding(false)} title="New event">
         <form className="aform" onSubmit={add}>
           <label className="field"><span>Title</span>
             <input className="input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
+          </label>
+          <label className="field"><span>Description</span>
+            <input className="input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="What happens, who plays, what to bring…" />
           </label>
           <div className="aform__grid aform__grid--2">
             <label className="field"><span>Date</span>
@@ -77,7 +128,7 @@ export default function AdminEvents() {
           </div>
           <div className="aform__foot">
             <button type="button" className="btn btn--line btn--sm" onClick={() => setAdding(false)}>Cancel</button>
-            <button type="submit" className="btn btn--solid btn--sm">Publish event</button>
+            <button type="submit" className="btn btn--solid btn--sm" disabled={saving}>{saving ? 'Publishing…' : 'Publish event'}</button>
           </div>
         </form>
       </Modal>

@@ -1,7 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Check, X, Plus } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
+import { supabaseConfigured } from '../../lib/supabase'
+import { listReservations, updateReservationStatus } from '../../lib/adminApi'
 import { fmtDate, cx } from '../../lib/format'
+
+const live = supabaseConfigured
 
 const INITIAL = [
   { id: 1, name: 'Mara V.', phone: '+63 917 555 0143', date: '2026-09-07', time: '1:00 PM', guests: 2, request: 'Window seat if possible', status: 'pending' },
@@ -12,11 +16,30 @@ const INITIAL = [
 
 export default function AdminReservations() {
   const { toast } = useToast()
-  const [list, setList] = useState(INITIAL)
+  const [list, setList] = useState(live ? [] : INITIAL)
+  const [loading, setLoading] = useState(live)
 
-  const setStatus = (id, status) => {
+  useEffect(() => {
+    if (!live) return
+    listReservations()
+      .then(setList)
+      .catch((err) => toast(`Couldn't load reservations — ${err.message}`, 'error'))
+      .finally(() => setLoading(false))
+  }, [toast])
+
+  const setStatus = async (id, status) => {
     setList((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)))
-    toast(status === 'cancelled' ? 'Reservation cancelled.' : `Reservation ${status}.`)
+    if (!live) {
+      toast(status === 'cancelled' ? 'Reservation cancelled.' : `Reservation ${status}.`)
+      return
+    }
+    try {
+      await updateReservationStatus(id, status)
+      toast(status === 'cancelled' ? 'Reservation cancelled.' : `Reservation ${status}.`)
+    } catch (err) {
+      toast(`Update failed — ${err.message}`, 'error')
+      listReservations().then(setList).catch(() => {})
+    }
   }
 
   return (
@@ -28,22 +51,27 @@ export default function AdminReservations() {
         <table className="table">
           <thead><tr><th>Guest</th><th>Date</th><th>Time</th><th>Guests</th><th>Request</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody>
-            {list.map((r) => (
-              <tr key={r.id}>
-                <td className="apage__strong">{r.name}<span className="apage__muted"> · {r.phone}</span></td>
-                <td>{fmtDate(r.date)}</td>
-                <td>{r.time}</td>
-                <td>{r.guests}</td>
-                <td className="apage__muted">{r.request || '—'}</td>
-                <td><span className={cx('pill', r.status === 'confirmed' ? 'pill--confirmed' : r.status === 'cancelled' ? 'pill--cancelled' : 'pill--preparing')}>{r.status}</span></td>
-                <td className="apage__actions">
-                  <button type="button" aria-label="Confirm" onClick={() => setStatus(r.id, 'confirmed')} disabled={r.status === 'confirmed'}><Check size={14} strokeWidth={2.2} /></button>
-                  <button type="button" aria-label="Cancel" onClick={() => setStatus(r.id, 'cancelled')} disabled={r.status === 'cancelled'}><X size={14} strokeWidth={2.2} /></button>
-                </td>
-              </tr>
-            ))}
+            {loading ? (
+              <tr><td colSpan={7} className="apage__empty">Loading reservations…</td></tr>
+            ) : (
+              list.map((r) => (
+                <tr key={r.id}>
+                  <td className="apage__strong">{r.name}<span className="apage__muted"> · {r.phone}</span></td>
+                  <td>{fmtDate(r.date)}</td>
+                  <td>{r.time}</td>
+                  <td>{r.guests}</td>
+                  <td className="apage__muted">{r.request || '—'}</td>
+                  <td><span className={cx('pill', r.status === 'confirmed' ? 'pill--confirmed' : r.status === 'cancelled' ? 'pill--cancelled' : 'pill--preparing')}>{r.status}</span></td>
+                  <td className="apage__actions">
+                    <button type="button" aria-label="Confirm" onClick={() => setStatus(r.id, 'confirmed')} disabled={r.status === 'confirmed'}><Check size={14} strokeWidth={2.2} /></button>
+                    <button type="button" aria-label="Cancel" onClick={() => setStatus(r.id, 'cancelled')} disabled={r.status === 'cancelled'}><X size={14} strokeWidth={2.2} /></button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
+        {!loading && list.length === 0 && <p className="apage__empty">No reservations yet.</p>}
       </section>
       <button type="button" className="btn btn--line btn--sm" onClick={() => toast('Walk-in noted at the host stand.')}>
         <Plus size={14} strokeWidth={2.2} /> Add walk-in

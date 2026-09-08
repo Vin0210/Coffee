@@ -70,9 +70,24 @@ serve(async (req: Request) => {
     const from = Deno.env.get('EMAIL_FROM')
     const shop = Deno.env.get('SHOP_EMAIL') || ''
     if (!key || !from) throw new Error('Missing RESEND_API_KEY / EMAIL_FROM secrets')
-    const { type, order } = await req.json()
+    const { type, order, email } = await req.json()
+    if (type === 'newsletter-welcome' && email) {
+      await send(
+        String(email),
+        'You’re on the list — Alegre × Good Habits',
+        `<div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;color:#211A17;">
+          <p style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#68705A;">Good Mail</p>
+          <h1 style="font-weight:400;">You’re in<em>.</em></h1>
+          <p>Drops, events, and finds — once a week, no noise. First mail lands Friday.</p>
+          <p style="font-size:12px;color:#888;">Alegre × Good Habits — Tumaga - Putik Rd, Zamboanga City</p>
+        </div>`,
+        key,
+        from
+      )
+      return new Response(JSON.stringify({ ok: true }), { headers: cors })
+    }
     if (type !== 'order-confirmation' || !order?.customer_email || !order?.ref) {
-      throw new Error('Expected { type: "order-confirmation", order: { ref, customer_email, … } }')
+      throw new Error('Expected { type: "order-confirmation", order: { ref, customer_email, … } } or { type: "newsletter-welcome", email }')
     }
     const html = receiptHtml(order)
     await send(order.customer_email, `Order ${order.ref} confirmed — Alegre × Good Habits`, html, key, from)

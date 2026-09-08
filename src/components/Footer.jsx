@@ -2,17 +2,42 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Instagram } from 'lucide-react'
 import { useToast } from '../context/ToastContext'
+import { supabase, supabaseConfigured } from '../lib/supabase'
 import { BRAND } from '../data/misc'
 
 export default function Footer() {
   const { toast } = useToast()
   const [email, setEmail] = useState('')
+  const [busy, setBusy] = useState(false)
 
-  const subscribe = (e) => {
+  const subscribe = async (e) => {
     e.preventDefault()
-    if (!/^\S+@\S+\.\S+$/.test(email)) { toast('Enter a valid email address', 'error'); return }
-    toast('You’re on the list — good mail is coming.')
-    setEmail('')
+    const value = email.trim().toLowerCase()
+    if (!/^\S+@\S+\.\S+$/.test(value)) { toast('Enter a valid email address', 'error'); return }
+    if (!supabaseConfigured) {
+      toast('Newsletter connects with Supabase — signed up locally for now.')
+      setEmail('')
+      return
+    }
+    setBusy(true)
+    try {
+      const { error } = await supabase.from('newsletter_subscribers').insert({ email: value })
+      if (error) {
+        if (error.code === '23505') toast('You’re already on the list — good mail is coming.')
+        else throw error
+      } else {
+        toast('You’re on the list — good mail is coming.')
+        // Welcome email is best-effort; the subscription already succeeded.
+        supabase.functions.invoke('send-email', {
+          body: { type: 'newsletter-welcome', email: value },
+        }).catch(() => {})
+      }
+      setEmail('')
+    } catch {
+      toast('Could not subscribe — try again in a bit.', 'error')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -49,7 +74,7 @@ export default function Footer() {
                 type="email" placeholder="your@email.com" value={email}
                 onChange={(e) => setEmail(e.target.value)} aria-label="Email address"
               />
-              <button type="submit" aria-label="Subscribe"><ArrowRight size={16} strokeWidth={2} /></button>
+              <button type="submit" aria-label="Subscribe" disabled={busy}><ArrowRight size={16} strokeWidth={2} /></button>
             </form>
             <p className="eyebrow footer__soc-label">Follow</p>
             <div className="footer__soc">

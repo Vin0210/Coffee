@@ -29,6 +29,8 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
+/* clip (not hidden) preserves position: sticky while killing page-level sideways pan */
+html, body { overflow-x: clip; }
 body {
   background: var(--off-white);
   color: var(--espresso);

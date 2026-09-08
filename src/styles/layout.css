@@ -30,8 +30,16 @@
 }
 .nav__ticker-track { white-space: nowrap; font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase; animation: marq 40s linear infinite; }
 .nav__bar {
-  display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  display: flex; align-items: center; justify-content: space-between; gap: clamp(12px, 4vw, 24px);
   height: var(--nav-h);
+}
+.nav__logo { display: flex; align-items: baseline; gap: 8px; font-family: var(--serif); font-size: clamp(16px, 2vw, 20px); letter-spacing: -0.01em; min-width: 0; white-space: nowrap; }
+.nav__actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+@media (max-width: 380px) {
+  .nav__bar { gap: 8px; }
+  .nav__logo { font-size: 15px; gap: 6px; }
+  .nav__actions { gap: 2px; }
+  .nav__icon { width: 36px; height: 36px; }
 }
 .nav__logo { display: flex; align-items: baseline; gap: 8px; font-family: var(--serif); font-size: clamp(16px, 2vw, 20px); letter-spacing: -0.01em; }
 .nav__logo-a { font-weight: 500; }

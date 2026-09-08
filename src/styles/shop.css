@@ -34,9 +34,11 @@
 @media (hover: none) {
   .pcard__heart { opacity: 1; transform: none; }
 }
-.pcard__body { padding-top: 14px; }
+.pcard__body { padding-top: 14px; min-width: 0; }
 .pcard__row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.pcard__row > * { min-width: 0; }
 .pcard__brand {
+  flex: 1;
   font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
   color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }

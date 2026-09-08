@@ -15,22 +15,17 @@ export default function CheckoutSuccess() {
   useMeta({ title: 'Payment status' })
   const [params] = useSearchParams()
   const ref = params.get('ref') || ''
-  const [state, setState] = useState('checking') // checking | paid | pending | error
+  const [state, setState] = useState(ref ? 'checking' : 'error') // checking | paid | pending | error
   const [total, setTotal] = useState(null)
 
   useEffect(() => {
-    if (!ref) {
-      setState('error')
-      return
-    }
-    verifyPayment(ref).then((res) => {
-      if (res.paid) {
-        setTotal(res.total ?? null)
-        setState('paid')
-      } else {
-        setState('pending')
-      }
-    }).catch(() => setState('error'))
+    if (!ref) return
+    verifyPayment(ref)
+      .then((res) => res.paid ? { ok: true, total: res.total } : { ok: false })
+      .then(({ ok, total }) => ok
+        ? (setTotal(total ?? null), setState('paid'))
+        : setState('pending'))
+      .catch(() => setState('error'))
   }, [ref])
 
   if (state === 'checking') {

@@ -33,7 +33,7 @@ export default function SpaceSection() {
             <p className="eyebrow">Find us</p>
             <p className="space__addr">Tumaga - Putik Rd, Zamboanga City</p>
           </div>
-          <a className="btn btn--line btn--sm" href="https://maps.google.com" target="_blank" rel="noreferrer">
+          <a className="btn btn--line btn--sm" href="https://www.google.com/maps/search/?api=1&query=Tumaga+Putik+Rd+Zamboanga+City" target="_blank" rel="noreferrer">
             Open in maps <ArrowUpRight size={14} strokeWidth={2} />
           </a>
         </Reveal>

@@ -70,6 +70,11 @@
 @media (max-width: 760px) {
   .pgrid--thrift, .pgrid--coffee { grid-template-columns: repeat(2, 1fr); gap: 22px 14px; }
 }
+/* Menu on phones: one full card per row — no half-cut neighbors. */
+@media (max-width: 560px) {
+  .pgrid--coffee { grid-template-columns: 1fr; gap: 30px; }
+}
+.pgrid > * { min-width: 0; }
 
 /* ---------- menu category filter ---------- */
 .filterbar {

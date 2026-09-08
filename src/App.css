@@ -1,0 +1,10 @@
+/* ============================================================
+   ALEGRE × GOOD HABITS — style entry
+   Plain CSS. Each layer lives in its own file under /styles.
+   ============================================================ */
+@import './styles/base.css';
+@import './styles/layout.css';
+@import './styles/home.css';
+@import './styles/shop.css';
+@import './styles/account.css';
+@import './styles/admin.css';

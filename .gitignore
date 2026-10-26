@@ -12,7 +12,7 @@ dist
 dist-ssr
 *.local
 
-# Env — never commit real keys. Cloudflare Pages takes these as dashboard vars.
+# Env
 .env
 .env.production
 
